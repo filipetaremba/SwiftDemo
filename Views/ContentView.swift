@@ -1,31 +1,7 @@
 import SwiftUI
 
-private let mesesDoAno = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-]
-
-private let chaveDados = "rendaFacil.dados.v1"
-
-struct RegistoPagamento: Identifiable, Codable {
-    var id = UUID()
-    var valor: Double
-    var data: Date
-    var mesDaRenda: Int
-    var anoDaRenda: Int
-    var nota: String
-}
-
-struct CasaRenda: Identifiable, Codable {
-    var id: Int
-    var nome: String
-    var inquilino: String
-    var rendaMensal: Double
-    var pagamentos: [RegistoPagamento]
-}
-
 struct ContentView: View {
-    @State private var casas: [CasaRenda] = ContentView.carregarCasas()
+    @State private var casas: [CasaRenda] = RendaRepository.carregarCasas()
     @State private var anoSelecionado = Calendar.current.component(.year, from: Date())
     @State private var casaSelecionadaID: Int?
     @State private var mostrarFormularioCasa = false
@@ -47,15 +23,11 @@ struct ContentView: View {
     }
 
     private var totalRecebido: Double {
-        casas.reduce(0) { total, casa in
-            total + casa.pagamentos
-                .filter { $0.anoDaRenda == anoSelecionado }
-                .reduce(0) { $0 + $1.valor }
-        }
+        casas.reduce(0) { $0 + $1.valorRecebido(no: anoSelecionado) }
     }
 
     private var totalEmDivida: Double {
-        casas.reduce(0) { $0 + dividaDaCasa($1) }
+        casas.reduce(0) { $0 + $1.divida(no: anoSelecionado) }
     }
 
     var body: some View {
@@ -119,15 +91,15 @@ struct ContentView: View {
                 anoSeletor
 
                 HStack(spacing: 12) {
-                    resumoCard(titulo: "Dívida total", valor: dinheiro(totalEmDivida), icone: "exclamationmark.circle", cor: .orange)
-                    resumoCard(titulo: "Recebido no ano", valor: dinheiro(totalRecebido), icone: "checkmark.circle", cor: .green)
+                    resumoCard(titulo: "Dívida total", valor: RendaFormatador.dinheiro(totalEmDivida), icone: "exclamationmark.circle", cor: .orange)
+                    resumoCard(titulo: "Recebido no ano", valor: RendaFormatador.dinheiro(totalRecebido), icone: "checkmark.circle", cor: .green)
                 }
 
                 HStack {
                     Text("As minhas casas")
                         .font(.title3.bold())
                     Spacer()
-                    Text("\(casas.count) de 5")
+                    Text("\(casas.count) de \(RendaConstants.limiteCasas)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -149,7 +121,7 @@ struct ContentView: View {
                     }
                 }
 
-                if casas.count < 5 {
+                if casas.count < RendaConstants.limiteCasas {
                     Button {
                         abrirNovaCasa()
                     } label: {
@@ -212,8 +184,8 @@ struct ContentView: View {
     }
 
     private func cartaoCasa(_ casa: CasaRenda) -> some View {
-        let divida = dividaDaCasa(casa)
-        let recebido = recebidoDaCasa(casa)
+        let divida = casa.divida(no: anoSelecionado)
+        let recebido = casa.valorRecebido(no: anoSelecionado)
 
         return HStack(spacing: 14) {
             Image(systemName: "house.fill")
@@ -230,10 +202,10 @@ struct ContentView: View {
                 Text(casa.inquilino.isEmpty ? "Inquilino não indicado" : casa.inquilino)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text("Renda: \(dinheiro(casa.rendaMensal))/mês")
+                Text("Renda: \(RendaFormatador.dinheiro(casa.rendaMensal))/mês")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("Recebido em \(anoSelecionado): \(dinheiro(recebido))")
+                Text("Recebido em \(anoSelecionado): \(RendaFormatador.dinheiro(recebido))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -244,7 +216,7 @@ struct ContentView: View {
                 Text(divida > 0 ? "Com dívida" : "Em dia")
                     .font(.caption.bold())
                     .foregroundStyle(divida > 0 ? .orange : .green)
-                Text(dinheiro(divida))
+                Text(RendaFormatador.dinheiro(divida))
                     .font(.subheadline.bold())
                     .foregroundStyle(.primary)
                 Image(systemName: "chevron.right")
@@ -267,12 +239,12 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(casa.inquilino.isEmpty ? "Inquilino não indicado" : casa.inquilino)
                         .font(.title3.bold())
-                    Text("Renda mensal: \(dinheiro(casa.rendaMensal))")
+                    Text("Renda mensal: \(RendaFormatador.dinheiro(casa.rendaMensal))")
                         .foregroundStyle(.secondary)
 
                     HStack(spacing: 12) {
-                        resumoCard(titulo: "Dívida", valor: dinheiro(dividaDaCasa(casa)), icone: "exclamationmark.circle", cor: dividaDaCasa(casa) > 0 ? .orange : .green)
-                        resumoCard(titulo: "Recebido", valor: dinheiro(recebidoDaCasa(casa)), icone: "checkmark.circle", cor: .green)
+                        resumoCard(titulo: "Dívida", valor: RendaFormatador.dinheiro(casa.divida(no: anoSelecionado)), icone: "exclamationmark.circle", cor: casa.divida(no: anoSelecionado) > 0 ? .orange : .green)
+                        resumoCard(titulo: "Recebido", valor: RendaFormatador.dinheiro(casa.valorRecebido(no: anoSelecionado)), icone: "checkmark.circle", cor: .green)
                     }
 
                     Button {
@@ -318,7 +290,7 @@ struct ContentView: View {
                                     .foregroundStyle(.green)
                                     .font(.title3)
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("\(mesesDoAno[pagamento.mesDaRenda - 1]) — \(dinheiro(pagamento.valor))")
+                                    Text("\(RendaConstants.meses[pagamento.mesDaRenda - 1]) — \(RendaFormatador.dinheiro(pagamento.valor))")
                                         .font(.subheadline.bold())
                                     Text("Pago em \(pagamento.data.formatted(date: .abbreviated, time: .omitted))")
                                         .font(.caption)
@@ -350,21 +322,18 @@ struct ContentView: View {
     }
 
     private func linhaMes(_ mes: Int, casa: CasaRenda) -> some View {
-        // CORRIGIDO: anoAtual e mesAtual declarados apenas uma vez.
         let anoAtual = Calendar.current.component(.year, from: Date())
         let mesAtual = Calendar.current.component(.month, from: Date())
         let mesVencido = anoSelecionado < anoAtual || (anoSelecionado == anoAtual && mes <= mesAtual)
         let aindaNaoVenceu = !mesVencido
-        let pago = casa.pagamentos
-            .filter { $0.anoDaRenda == anoSelecionado && $0.mesDaRenda == mes }
-            .reduce(0) { $0 + $1.valor }
+        let pago = casa.valorPago(no: mes, do: anoSelecionado)
         let saldo = max(0, (mesVencido ? casa.rendaMensal : 0) - pago)
         let estado: String = aindaNaoVenceu ? "Ainda não venceu" : (saldo <= 0 ? "Pago" : (pago > 0 ? "Parcial" : "Pendente"))
         let cor: Color = aindaNaoVenceu ? .secondary : (saldo <= 0 ? .green : (pago > 0 ? .orange : .red))
 
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(mesesDoAno[mes - 1])
+                Text(RendaConstants.meses[mes - 1])
                     .font(.subheadline.bold())
                 Text(estado)
                     .font(.caption)
@@ -372,10 +341,10 @@ struct ContentView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text("Pago: \(dinheiro(pago))")
+                Text("Pago: \(RendaFormatador.dinheiro(pago))")
                     .font(.subheadline)
                 if saldo > 0 {
-                    Text("Em falta: \(dinheiro(saldo))")
+                    Text("Em falta: \(RendaFormatador.dinheiro(saldo))")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -418,7 +387,7 @@ struct ContentView: View {
 
                     Picker("Mês a que se refere", selection: $mesPagamento) {
                         ForEach(1...12, id: \.self) { mes in
-                            Text(mesesDoAno[mes - 1]).tag(mes)
+                            Text(RendaConstants.meses[mes - 1]).tag(mes)
                         }
                     }
 
@@ -447,44 +416,8 @@ struct ContentView: View {
         }
     }
 
-    private func dividaDaCasa(_ casa: CasaRenda) -> Double {
-        let anoAtual = Calendar.current.component(.year, from: Date())
-        let mesAtual = Calendar.current.component(.month, from: Date())
-        let mesesVencidos: Int
-        if anoSelecionado < anoAtual {
-            mesesVencidos = 12
-        } else if anoSelecionado > anoAtual {
-            mesesVencidos = 0
-        } else {
-            mesesVencidos = mesAtual
-        }
-
-        let totalDevido = casa.rendaMensal * Double(mesesVencidos)
-        let totalPagoParaMesesVencidos = casa.pagamentos
-            .filter { $0.anoDaRenda == anoSelecionado && $0.mesDaRenda <= mesesVencidos }
-            .reduce(0) { $0 + $1.valor }
-
-        return max(0, totalDevido - totalPagoParaMesesVencidos)
-    }
-
-    private func recebidoDaCasa(_ casa: CasaRenda) -> Double {
-        casa.pagamentos
-            .filter { $0.anoDaRenda == anoSelecionado }
-            .reduce(0) { $0 + $1.valor }
-    }
-
-    private func dinheiro(_ valor: Double) -> String {
-        let formatador = NumberFormatter()
-        formatador.numberStyle = .decimal
-        formatador.maximumFractionDigits = 2
-        formatador.minimumFractionDigits = 0
-        formatador.groupingSeparator = " "
-        let numero = formatador.string(from: NSNumber(value: valor)) ?? "0"
-        return "\(numero) MT"
-    }
-
     private func proximoIdLivre() -> Int {
-        for numero in 1...5 {
+        for numero in 1...RendaConstants.limiteCasas {
             if !casas.contains(where: { $0.id == numero }) {
                 return numero
             }
@@ -493,7 +426,7 @@ struct ContentView: View {
     }
 
     private func abrirNovaCasa() {
-        guard casas.count < 5 else {
+        guard casas.count < RendaConstants.limiteCasas else {
             mensagemErro = "A aplicação permite registar no máximo cinco casas."
             return
         }
@@ -525,12 +458,13 @@ struct ContentView: View {
             return
         }
 
+        let casasAnteriores = casas
         if let id = casaEmEdicaoID, let indice = casas.firstIndex(where: { $0.id == id }) {
             casas[indice].nome = novoNomeCasa.trimmingCharacters(in: .whitespacesAndNewlines)
             casas[indice].inquilino = novoInquilino.trimmingCharacters(in: .whitespacesAndNewlines)
             casas[indice].rendaMensal = renda
         } else {
-            guard casas.count < 5 else {
+            guard casas.count < RendaConstants.limiteCasas else {
                 mensagemErro = "Já existem cinco casas registadas."
                 return
             }
@@ -543,7 +477,10 @@ struct ContentView: View {
                 pagamentos: []
             ))
         }
-        guardarCasas()
+        guard guardarCasas() else {
+            casas = casasAnteriores
+            return
+        }
         mostrarFormularioCasa = false
     }
 
@@ -569,36 +506,32 @@ struct ContentView: View {
         )
 
         // O pagamento fica associado ao ano/mês da renda e à data em que foi recebido.
+        let casasAnteriores = casas
         casas[indice].pagamentos.append(pagamento)
-        guardarCasas()
+        guard guardarCasas() else {
+            casas = casasAnteriores
+            return
+        }
         mostrarFormularioPagamento = false
     }
 
     private func apagarPagamento(_ pagamento: RegistoPagamento, daCasa casa: CasaRenda) {
         guard let indice = casas.firstIndex(where: { $0.id == casa.id }) else { return }
+        let casasAnteriores = casas
         casas[indice].pagamentos.removeAll { $0.id == pagamento.id }
-        guardarCasas()
-    }
-
-    private func guardarCasas() {
-        guard let dados = try? JSONEncoder().encode(casas) else { return }
-        UserDefaults.standard.set(dados, forKey: chaveDados)
-    }
-
-    private static func carregarCasas() -> [CasaRenda] {
-        if let dados = UserDefaults.standard.data(forKey: chaveDados),
-           let guardadas = try? JSONDecoder().decode([CasaRenda].self, from: dados) {
-            return guardadas
+        guard guardarCasas() else {
+            casas = casasAnteriores
+            return
         }
+    }
 
-        return (1...5).map { numero in
-            CasaRenda(
-                id: numero,
-                nome: "Casa \(numero)",
-                inquilino: "",
-                rendaMensal: 0,
-                pagamentos: []
-            )
+    private func guardarCasas() -> Bool {
+        do {
+            try RendaRepository.guardarCasas(casas)
+            return true
+        } catch {
+            mensagemErro = "Não foi possível guardar os dados: \(error.localizedDescription)"
+            return false
         }
     }
 }

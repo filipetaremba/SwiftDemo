@@ -10,7 +10,9 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: ContentView.swift
+      - path: Views
+      - path: Models
+      - path: Services
       - path: RendaFacilApp.swift
     settings:
       base:
