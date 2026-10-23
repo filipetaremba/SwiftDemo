@@ -1,18 +1,20 @@
-name: SwiftDemo
+
+name: RendaFacil
 
 options:
-  bundleIdPrefix: mz.filipe
+  bundleIdPrefix: mz.rendafacil
   deploymentTarget:
     iOS: "17.0"
 
 targets:
-  SwiftDemo:
+  RendaFacil:
     type: application
     platform: iOS
     sources:
-      - path: SwiftDemo
+      - path: RendaFacil
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: mz.filipe.SwiftDemo
+        PRODUCT_BUNDLE_IDENTIFIER: mz.rendafacil.app
+        PRODUCT_NAME: RendaFacil
         SWIFT_VERSION: "5.0"
         GENERATE_INFOPLIST_FILE: YES
