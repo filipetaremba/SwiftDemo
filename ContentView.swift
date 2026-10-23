@@ -258,7 +258,11 @@ struct ContentView: View {
     }
 
     private func detalhesCasa(_ casa: CasaRenda) -> some View {
-        ScrollView {
+        let pagamentosDoAno = casa.pagamentos
+            .filter { $0.anoDaRenda == anoSelecionado }
+            .sorted { $0.data > $1.data }
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(casa.inquilino.isEmpty ? "Inquilino não indicado" : casa.inquilino)
@@ -302,17 +306,13 @@ struct ContentView: View {
                     Text("Histórico de pagamentos")
                         .font(.title3.bold())
 
-                    let pagamentos = casa.pagamentos
-                        .filter { $0.anoDaRenda == anoSelecionado }
-                        .sorted { $0.data > $1.data }
-
-                    if pagamentos.isEmpty {
+                    if pagamentosDoAno.isEmpty {
                         Text("Ainda não há pagamentos registados neste ano.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .padding()
                     } else {
-                        ForEach(pagamentos) { pagamento in
+                        ForEach(pagamentosDoAno) { pagamento in
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
@@ -350,16 +350,15 @@ struct ContentView: View {
     }
 
     private func linhaMes(_ mes: Int, casa: CasaRenda) -> some View {
+        // CORRIGIDO: anoAtual e mesAtual declarados apenas uma vez.
         let anoAtual = Calendar.current.component(.year, from: Date())
         let mesAtual = Calendar.current.component(.month, from: Date())
         let mesVencido = anoSelecionado < anoAtual || (anoSelecionado == anoAtual && mes <= mesAtual)
+        let aindaNaoVenceu = !mesVencido
         let pago = casa.pagamentos
             .filter { $0.anoDaRenda == anoSelecionado && $0.mesDaRenda == mes }
             .reduce(0) { $0 + $1.valor }
         let saldo = max(0, (mesVencido ? casa.rendaMensal : 0) - pago)
-        let hoje = Calendar.current.component(.month, from: Date())
-        let anoAtual = Calendar.current.component(.year, from: Date())
-        let aindaNaoVenceu = anoSelecionado > anoAtual || (anoSelecionado == anoAtual && mes > hoje)
         let estado: String = aindaNaoVenceu ? "Ainda não venceu" : (saldo <= 0 ? "Pago" : (pago > 0 ? "Parcial" : "Pendente"))
         let cor: Color = aindaNaoVenceu ? .secondary : (saldo <= 0 ? .green : (pago > 0 ? .orange : .red))
 
@@ -484,13 +483,22 @@ struct ContentView: View {
         return "\(numero) MT"
     }
 
+    private func proximoIdLivre() -> Int {
+        for numero in 1...5 {
+            if !casas.contains(where: { $0.id == numero }) {
+                return numero
+            }
+        }
+        return casas.count + 1
+    }
+
     private func abrirNovaCasa() {
         guard casas.count < 5 else {
             mensagemErro = "A aplicação permite registar no máximo cinco casas."
             return
         }
         casaEmEdicaoID = nil
-        novoNomeCasa = "Casa \( (1...5).first { numero in !casas.contains { $0.id == numero } } ?? (casas.count + 1) )"
+        novoNomeCasa = "Casa \(proximoIdLivre())"
         novoInquilino = ""
         novaRenda = ""
         mostrarFormularioCasa = true
@@ -526,7 +534,7 @@ struct ContentView: View {
                 mensagemErro = "Já existem cinco casas registadas."
                 return
             }
-            let id = (1...5).first { numero in !casas.contains { $0.id == numero } } ?? (casas.count + 1)
+            let id = proximoIdLivre()
             casas.append(CasaRenda(
                 id: id,
                 nome: novoNomeCasa.trimmingCharacters(in: .whitespacesAndNewlines),
