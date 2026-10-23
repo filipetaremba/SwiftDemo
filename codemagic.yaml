@@ -1,6 +1,7 @@
+
 workflows:
-  swift-demo:
-    name: SwiftDemo - iOS Simulator
+  renda-facil:
+    name: RendaFacil - iOS Simulator
     instance_type: mac_mini_m2
     max_build_duration: 30
 
@@ -21,8 +22,8 @@ workflows:
           set -e
 
           xcodebuild \
-            -project SwiftDemo.xcodeproj \
-            -scheme SwiftDemo \
+            -project RendaFacil.xcodeproj \
+            -scheme RendaFacil \
             -sdk iphonesimulator \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
@@ -34,14 +35,14 @@ workflows:
         script: |
           set -e
 
-          APP_PATH="build/Build/Products/Debug-iphonesimulator/SwiftDemo.app"
+          APP_PATH="build/Build/Products/Debug-iphonesimulator/RendaFacil.app"
 
           test -d "$APP_PATH"
 
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP_PATH" \
-            build/SwiftDemo-iOS-Simulator.zip
+            build/RendaFacil-iOS-Simulator.zip
 
     artifacts:
-      - build/SwiftDemo-iOS-Simulator.zip
+      - build/RendaFacil-iOS-Simulator.zip
       - /tmp/xcodebuild_logs/*.log
