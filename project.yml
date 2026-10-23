@@ -1,4 +1,3 @@
-
 name: RendaFacil
 
 options:
@@ -11,7 +10,8 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: RendaFacil
+      - path: ContentView.swift
+      - path: RendaFacilApp.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: mz.rendafacil.app
